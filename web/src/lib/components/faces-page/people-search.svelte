@@ -37,6 +37,7 @@
     searchName: string;
     searchedPeopleLocal: PersonResponseDto[];
     type: 'searchBar' | 'input';
+    withHidden?: boolean;
     numberPeopleToSearch?: number;
     inputClass?: string;
     showLoadingSpinner?: boolean;
@@ -50,6 +51,7 @@
     // eslint-disable-next-line no-useless-assignment
     searchedPeopleLocal = $bindable(),
     type,
+    withHidden = false,
     numberPeopleToSearch = maximumLengthSearchPeople,
     inputClass = 'w-full gap-2',
     showLoadingSpinner = $bindable(false),
@@ -78,7 +80,7 @@
     abortController = new AbortController();
     timeout = setTimeout(() => (showLoadingSpinner = true), timeBeforeShowLoadingSpinner);
     try {
-      const data = await searchPerson({ name: searchName }, { signal: abortController?.signal });
+      const data = await searchPerson({ name: searchName, withHidden }, { signal: abortController?.signal });
       searchedPeople = data;
       searchWord = searchName;
     } catch (error) {

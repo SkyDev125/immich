@@ -11,6 +11,7 @@
     mdiAccountMultipleCheckOutline,
     mdiDotsVertical,
     mdiEyeOffOutline,
+    mdiEyeOutline,
     mdiHeart,
     mdiHeartMinusOutline,
     mdiHeartOutline,
@@ -22,15 +23,18 @@
   type Props = {
     person: PersonResponseDto;
     onMergePeople: () => void;
-    onHidePerson: () => void;
+    onTogglePerson: () => void;
     onToggleFavorite: () => void;
   };
 
-  let { person, onMergePeople, onHidePerson, onToggleFavorite }: Props = $props();
+  let { person, onMergePeople, onTogglePerson, onToggleFavorite }: Props = $props();
 
   let showVerticalDots = $state(false);
 
   const { SetDateOfBirth } = $derived(getPersonActions($t, person));
+
+  const togglePersonIcon = $derived(person.isHidden ? mdiEyeOutline : mdiEyeOffOutline);
+  const togglePersonText = $derived(person.isHidden ? $t('unhide_person') : $t('hide_person'));
 </script>
 
 <div
@@ -48,6 +52,7 @@
   >
     <div class="w-full h-full rounded-xl brightness-95 filter">
       <ImageThumbnail
+        hidden={person.isHidden}
         shadow
         url={getPeopleThumbnailUrl(person)}
         altText={person.name}
@@ -74,7 +79,7 @@
         icon={mdiDotsVertical}
         title={$t('show_person_options')}
       >
-        <MenuOption onClick={onHidePerson} icon={mdiEyeOffOutline} text={$t('hide_person')} />
+        <MenuOption onClick={onTogglePerson} icon={togglePersonIcon} text={togglePersonText} />
         <ActionMenuItem action={SetDateOfBirth} />
         <MenuOption onClick={onMergePeople} icon={mdiAccountMultipleCheckOutline} text={$t('merge_people')} />
         <MenuOption

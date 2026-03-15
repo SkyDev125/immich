@@ -18,8 +18,8 @@
   import { handleError } from '$lib/utils/handle-error';
   import { clearQueryParam } from '$lib/utils/navigation';
   import { getAllPeople, getPerson, searchPerson, updatePerson, type PersonResponseDto } from '@immich/sdk';
-  import { Button, Icon, modalManager, toastManager } from '@immich/ui';
-  import { mdiAccountOff, mdiEyeOutline } from '@mdi/js';
+  import { Button, Icon, IconButton, modalManager, toastManager } from '@immich/ui';
+  import { mdiAccountCog, mdiAccountOff, mdiEyeOffOutline, mdiEyeOutline } from '@mdi/js';
   import { onMount } from 'svelte';
   import { t } from 'svelte-i18n';
   import { quintOut } from 'svelte/easing';
@@ -33,6 +33,7 @@
   let { data }: Props = $props();
 
   let selectHidden = $state(false);
+  let showHidden = $state(false);
   let searchName = $state('');
   let newName = $state('');
   let currentPage = $state(1);
@@ -164,11 +165,11 @@
     }
   };
 
-  const handleHidePerson = async (detail: PersonResponseDto) => {
+  const handleTogglePerson = async (detail: PersonResponseDto) => {
     try {
       const updatedPerson = await updatePerson({
         id: detail.id,
-        personUpdateDto: { isHidden: true },
+        personUpdateDto: { isHidden: !detail.isHidden },
       });
 
       people = people.map((person: PersonResponseDto) => {
@@ -180,7 +181,7 @@
 
       toastManager.success($t('changed_visibility_successfully'));
     } catch (error) {
-      handleError(error, $t('errors.unable_to_hide_person'));
+      handleError(error, $t('errors.unable_to_toggle_person'));
     }
   };
 
@@ -213,10 +214,9 @@
   };
 
   let people = $derived(data.people.people);
-
   let visiblePeople = $derived(people.filter((people) => !people.isHidden));
   let countVisiblePeople = $derived(searchName ? searchedPeopleLocal.length : data.people.total - data.people.hidden);
-  let showPeople = $derived(searchName ? searchedPeopleLocal : visiblePeople);
+  let showPeople = $derived(searchName ? searchedPeopleLocal : showHidden ? people : visiblePeople);
 
   const onNameChangeInputFocus = (person: PersonResponseDto) => {
     editingPerson = person;
@@ -292,98 +292,111 @@
 
 <OnEvents {onPersonUpdate} />
 
-<UserPageLayout
-  title={$t('people')}
-  description={countVisiblePeople === 0 && !searchName ? undefined : `(${countVisiblePeople.toLocaleString($locale)})`}
-  use={[
-    [
-      scrollMemory,
-      {
-        routeStartsWith: Route.people(),
-        beforeSave: () => {
-          if (currentPage) {
-            sessionStorage.setItem(SessionStorageKey.INFINITE_SCROLL_PAGE, currentPage.toString());
-          }
+<div inert={selectHidden || undefined}>
+  <UserPageLayout
+    title={$t('people')}
+    description={countVisiblePeople === 0 && !searchName
+      ? undefined
+      : `(${countVisiblePeople.toLocaleString($locale)})`}
+    use={[
+      [
+        scrollMemory,
+        {
+          routeStartsWith: Route.people(),
+          beforeSave: () => {
+            if (currentPage) {
+              sessionStorage.setItem(SessionStorageKey.INFINITE_SCROLL_PAGE, currentPage.toString());
+            }
+          },
+          beforeClear: () => {
+            sessionStorage.removeItem(SessionStorageKey.INFINITE_SCROLL_PAGE);
+          },
+          beforeLoad: loadInitialScroll,
         },
-        beforeClear: () => {
-          sessionStorage.removeItem(SessionStorageKey.INFINITE_SCROLL_PAGE);
-        },
-        beforeLoad: loadInitialScroll,
-      },
-    ],
-  ]}
->
-  {#snippet buttons()}
-    {#if people.length > 0}
-      <div class="flex gap-2 items-center justify-center">
-        <div class="hidden sm:block">
-          <div class="w-40 lg:w-80 h-10">
-            <SearchPeople
-              bind:this={searchPeopleElement}
-              type="searchBar"
-              placeholder={$t('search_people')}
-              onReset={onResetSearchBar}
-              onSearch={handleSearch}
-              bind:searchName
-              bind:searchedPeopleLocal
+      ],
+    ]}
+  >
+    {#snippet buttons()}
+      {#if people.length > 0}
+        <div class="flex gap-2 items-center justify-center">
+          <div class="hidden sm:block">
+            <div class="w-40 lg:w-80 h-10">
+              <SearchPeople
+                bind:this={searchPeopleElement}
+                type="searchBar"
+                placeholder={$t('search_people')}
+                withHidden={showHidden}
+                onReset={onResetSearchBar}
+                onSearch={handleSearch}
+                bind:searchName
+                bind:searchedPeopleLocal
+              />
+            </div>
+          </div>
+          <IconButton
+            size="medium"
+            color="secondary"
+            variant="ghost"
+            aria-label={showHidden ? $t('exclude_hidden') : $t('include_hidden')}
+            icon={showHidden ? mdiEyeOutline : mdiEyeOffOutline}
+            onclick={() => (showHidden = !showHidden)}
+          />
+          <Button
+            leadingIcon={mdiAccountCog}
+            onclick={() => (selectHidden = !selectHidden)}
+            size="medium"
+            variant="ghost"
+            color="secondary">{$t('manage_people')}</Button
+          >
+        </div>
+      {/if}
+    {/snippet}
+
+    {#if countVisiblePeople > 0 && (!searchName || searchedPeopleLocal.length > 0)}
+      <PeopleInfiniteScroll people={showPeople} hasNextPage={!!nextPage && !searchName} {loadNextPage}>
+        {#snippet children({ person })}
+          <div
+            class="p-2 rounded-xl hover:bg-gray-200 border-2 hover:border-immich-primary/50 hover:shadow-sm dark:hover:bg-immich-dark-primary/20 hover:dark:border-immich-dark-primary/25 border-transparent transition-all"
+          >
+            <PeopleCard
+              {person}
+              onMergePeople={() => handleMergePeople(person)}
+              onTogglePerson={() => handleTogglePerson(person)}
+              onToggleFavorite={() => handleToggleFavorite(person)}
+            />
+
+            <input
+              type="text"
+              class=" bg-white dark:bg-immich-dark-gray border-gray-100 placeholder-gray-400 text-center dark:border-gray-900 w-full rounded-2xl mt-2 py-2 text-sm text-primary"
+              value={person.name}
+              placeholder={$t('add_a_name')}
+              use:shortcut={{ shortcut: { key: 'Enter' }, onShortcut: (e) => e.currentTarget.blur() }}
+              onfocusin={() => onNameChangeInputFocus(person)}
+              onfocusout={() => onNameChangeSubmit(newName, person)}
+              oninput={(event) => onNameChangeInputUpdate(event)}
             />
           </div>
+        {/snippet}
+      </PeopleInfiniteScroll>
+    {:else}
+      <div class="flex min-h-[calc(66vh-11rem)] w-full place-content-center items-center dark:text-white">
+        <div class="flex flex-col content-center items-center text-center">
+          <Icon icon={mdiAccountOff} size="3.5em" />
+          <p class="mt-5 text-3xl font-medium max-w-lg line-clamp-2 overflow-hidden">
+            {$t(searchName ? 'search_no_people_named' : 'search_no_people', { values: { name: searchName } })}
+          </p>
         </div>
-        <Button
-          leadingIcon={mdiEyeOutline}
-          onclick={() => (selectHidden = !selectHidden)}
-          size="small"
-          variant="ghost"
-          color="secondary">{$t('show_and_hide_people')}</Button
-        >
       </div>
     {/if}
-  {/snippet}
-
-  {#if countVisiblePeople > 0 && (!searchName || searchedPeopleLocal.length > 0)}
-    <PeopleInfiniteScroll people={showPeople} hasNextPage={!!nextPage && !searchName} {loadNextPage}>
-      {#snippet children({ person })}
-        <div
-          class="p-2 rounded-xl hover:bg-gray-200 border-2 hover:border-immich-primary/50 hover:shadow-sm dark:hover:bg-immich-dark-primary/20 hover:dark:border-immich-dark-primary/25 border-transparent transition-all"
-        >
-          <PeopleCard
-            {person}
-            onMergePeople={() => handleMergePeople(person)}
-            onHidePerson={() => handleHidePerson(person)}
-            onToggleFavorite={() => handleToggleFavorite(person)}
-          />
-
-          <input
-            type="text"
-            class=" bg-white dark:bg-immich-dark-gray border-gray-100 placeholder-gray-400 text-center dark:border-gray-900 w-full rounded-2xl mt-2 py-2 text-sm text-primary"
-            value={person.name}
-            placeholder={$t('add_a_name')}
-            use:shortcut={{ shortcut: { key: 'Enter' }, onShortcut: (e) => e.currentTarget.blur() }}
-            onfocusin={() => onNameChangeInputFocus(person)}
-            onfocusout={() => onNameChangeSubmit(newName, person)}
-            oninput={(event) => onNameChangeInputUpdate(event)}
-          />
-        </div>
-      {/snippet}
-    </PeopleInfiniteScroll>
-  {:else}
-    <div class="flex min-h-[calc(66vh-11rem)] w-full place-content-center items-center dark:text-white">
-      <div class="flex flex-col content-center items-center text-center">
-        <Icon icon={mdiAccountOff} size="3.5em" />
-        <p class="mt-5 text-3xl font-medium max-w-lg line-clamp-2 overflow-hidden">
-          {$t(searchName ? 'search_no_people_named' : 'search_no_people', { values: { name: searchName } })}
-        </p>
-      </div>
-    </div>
-  {/if}
-</UserPageLayout>
+  </UserPageLayout>
+</div>
 
 {#if selectHidden}
   <dialog
     transition:fly={{ y: innerHeight, duration: 150, easing: quintOut, opacity: 0 }}
     class="fixed inset-0 h-full w-full max-w-none max-h-none bg-light"
     aria-labelledby="manage-visibility-title"
-    {@attach (dialog) => dialog.showModal()}
+    {@attach (dialog) => dialog.show()}
   >
     <ManagePeopleVisibility
       {people}
