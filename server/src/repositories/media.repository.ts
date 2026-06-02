@@ -36,6 +36,7 @@ import {
   VideoInfo,
   VideoPacketInfo,
 } from 'src/types';
+import { getEffectiveStraightenRotation, getStraightenExtractRectangle } from 'src/utils/editor';
 import { handlePromiseError } from 'src/utils/misc';
 import { createAffineMatrix } from 'src/utils/transform';
 
@@ -152,24 +153,57 @@ export class MediaRepository {
     return this.getImageDecodingPipeline(input, options).raw().toBuffer({ resolveWithObject: true });
   }
 
-  private applyEdits(pipeline: sharp.Sharp, edits: AssetEditActionItem[]): sharp.Sharp {
-    const crop = edits.find((edit) => edit.action === 'crop');
-    if (crop) {
-      pipeline = pipeline.extract({
-        left: Math.round(crop.parameters.x),
-        top: Math.round(crop.parameters.y),
-        width: Math.round(crop.parameters.width),
-        height: Math.round(crop.parameters.height),
-      });
-    }
+  private applyEdits(
+    pipeline: sharp.Sharp,
+    edits: AssetEditActionItem[],
+    dimensions?: { width: number; height: number },
+  ): sharp.Sharp {
+    const rotateEdit = edits.find((edit) => edit.action === 'rotate');
+    const straightenActive = rotateEdit && rotateEdit.parameters.angle % 90 !== 0;
 
-    const affineEditOperations = edits.filter((edit) => edit.action !== 'crop');
-    if (affineEditOperations.length > 0) {
-      const { a, b, c, d } = createAffineMatrix(affineEditOperations);
-      pipeline = pipeline.affine([
-        [a, b],
-        [c, d],
-      ]);
+    if (straightenActive) {
+      const mirrorEdits = edits.filter((edit) => edit.action === 'mirror');
+      const effectiveRotation = getEffectiveStraightenRotation(rotateEdit.parameters.angle, mirrorEdits);
+
+      pipeline = pipeline.rotate(effectiveRotation);
+
+      for (const mirror of mirrorEdits) {
+        if (mirror.parameters.axis === 'horizontal') {
+          pipeline = pipeline.flop();
+        } else if (mirror.parameters.axis === 'vertical') {
+          pipeline = pipeline.flip();
+        }
+      }
+
+      const crop = edits.find((edit) => edit.action === 'crop');
+      if (crop) {
+        if (!dimensions?.width || !dimensions.height) {
+          throw new Error('Image dimensions are required for straighten edits');
+        }
+
+        pipeline = pipeline.extract(
+          getStraightenExtractRectangle(crop.parameters, dimensions, rotateEdit.parameters.angle, edits),
+        );
+      }
+    } else {
+      const crop = edits.find((edit) => edit.action === 'crop');
+      if (crop) {
+        pipeline = pipeline.extract({
+          left: Math.round(crop.parameters.x),
+          top: Math.round(crop.parameters.y),
+          width: Math.round(crop.parameters.width),
+          height: Math.round(crop.parameters.height),
+        });
+      }
+
+      const affineEditOperations = edits.filter((edit) => edit.action !== 'crop');
+      if (affineEditOperations.length > 0) {
+        const { a, b, c, d } = createAffineMatrix(affineEditOperations);
+        pipeline = pipeline.affine([
+          [a, b],
+          [c, d],
+        ]);
+      }
     }
 
     return pipeline;
@@ -210,7 +244,7 @@ export class MediaRepository {
     }
 
     if (options.edits && options.edits.length > 0) {
-      pipeline = this.applyEdits(pipeline, options.edits);
+      pipeline = this.applyEdits(pipeline, options.edits, options.raw);
     }
 
     if (options.size !== undefined) {

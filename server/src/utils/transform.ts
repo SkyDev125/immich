@@ -1,6 +1,7 @@
 import { AssetEditAction, AssetEditActionItem } from 'src/dtos/editing.dto';
 import { AssetOcrResponseDto } from 'src/dtos/ocr.dto';
 import { ImageDimensions } from 'src/types';
+import { getStraightenScale, splitRotation } from 'src/utils/editor';
 import { applyToPoint, compose, flipX, flipY, identity, Matrix, rotate, scale, translate } from 'transformation-matrix';
 
 export const getOutputDimensions = (
@@ -18,7 +19,15 @@ export const getOutputDimensions = (
   for (const edit of edits) {
     if (edit.action === AssetEditAction.Rotate) {
       const angleDegrees = edit.parameters.angle;
-      if (angleDegrees === 90 || angleDegrees === 270) {
+      const { quarterTurn, straightenAngle } = splitRotation(angleDegrees);
+
+      if (straightenAngle !== 0 && crop) {
+        const straightenScale = getStraightenScale(startingDimensions, straightenAngle);
+        width = Math.round(crop.parameters.width / straightenScale);
+        height = Math.round(crop.parameters.height / straightenScale);
+      }
+
+      if (quarterTurn === 90 || quarterTurn === 270) {
         [width, height] = [height, width];
       }
     }

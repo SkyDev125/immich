@@ -1,7 +1,32 @@
 import { AssetEditAction, AssetEditActionItem, MirrorAxis } from 'src/dtos/editing.dto';
 import { AssetOcrResponseDto } from 'src/dtos/ocr.dto';
-import { transformFaceBoundingBox, transformOcrBoundingBox } from 'src/utils/transform';
+import { getOutputDimensions, transformFaceBoundingBox, transformOcrBoundingBox } from 'src/utils/transform';
 import { describe, expect, it } from 'vitest';
+
+describe('getOutputDimensions', () => {
+  it('swaps crop dimensions for a quarter-turn crop without applying straighten scale', () => {
+    const edits: AssetEditActionItem[] = [
+      { action: AssetEditAction.Crop, parameters: { x: 200, y: 250, width: 600, height: 450 } },
+      { action: AssetEditAction.Rotate, parameters: { angle: 90 } },
+    ];
+
+    const dimensions = getOutputDimensions(edits, { width: 1000, height: 800 });
+
+    expect(dimensions).toEqual({ width: 450, height: 600 });
+  });
+
+  it('should swap crop dimensions for a quarter-turn straighten edit', () => {
+    const edits: AssetEditActionItem[] = [
+      { action: AssetEditAction.Crop, parameters: { x: 200, y: 250, width: 600, height: 450 } },
+      { action: AssetEditAction.Rotate, parameters: { angle: 100 } },
+    ];
+
+    const dimensions = getOutputDimensions(edits, { width: 1000, height: 800 });
+
+    expect(dimensions.width).toBeLessThan(dimensions.height);
+    expect(dimensions.width / dimensions.height).toBeCloseTo(450 / 600, 1);
+  });
+});
 
 describe('transformFaceBoundingBox', () => {
   const baseFace = {

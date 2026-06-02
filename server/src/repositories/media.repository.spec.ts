@@ -270,6 +270,77 @@ describe(MediaRepository.name, () => {
       expect(await getPixelColor(buffer, 990, 10)).toEqual({ r: 255, g: 0, b: 0 });
     });
 
+    it('should swap straighten crop dimensions for 90° rotation', async () => {
+      const result = sut['applyEdits'](
+        sharp({
+          create: {
+            width: 1000,
+            height: 800,
+            channels: 4,
+            background: { r: 255, g: 0, b: 0, alpha: 1 },
+          },
+        }).png(),
+        [
+          { action: AssetEditAction.Crop, parameters: { x: 200, y: 250, width: 600, height: 450 } },
+          { action: AssetEditAction.Rotate, parameters: { angle: 100 } },
+        ],
+        { width: 1000, height: 800 },
+      );
+
+      const metadata = await result
+        .png()
+        .toBuffer()
+        .then((buffer) => sharp(buffer).metadata());
+      expect(metadata.width).toBeLessThan(metadata.height!);
+      expect(metadata.width! / metadata.height!).toBeCloseTo(450 / 600, 1);
+    });
+
+    it('should invert straighten rotation for a single mirror', async () => {
+      const image = sharp({
+        create: {
+          width: 100,
+          height: 80,
+          channels: 4,
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
+        },
+      }).png();
+
+      const result = sut['applyEdits'](
+        image,
+        [
+          { action: AssetEditAction.Crop, parameters: { x: 20, y: 20, width: 60, height: 40 } },
+          { action: AssetEditAction.Mirror, parameters: { axis: MirrorAxis.Horizontal } },
+          { action: AssetEditAction.Rotate, parameters: { angle: 43 } },
+        ],
+        { width: 100, height: 80 },
+      );
+
+      const metadata = await result
+        .png()
+        .toBuffer()
+        .then((buffer) => sharp(buffer).metadata());
+      expect(metadata.width).toBe(38);
+      expect(metadata.height).toBe(25);
+    });
+
+    it('should require source dimensions for straighten extraction', () => {
+      const image = sharp({
+        create: {
+          width: 100,
+          height: 80,
+          channels: 4,
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
+        },
+      }).png();
+
+      expect(() =>
+        sut['applyEdits'](image, [
+          { action: AssetEditAction.Crop, parameters: { x: 20, y: 20, width: 60, height: 40 } },
+          { action: AssetEditAction.Rotate, parameters: { angle: 43 } },
+        ]),
+      ).toThrow('Image dimensions are required for straighten edits');
+    });
+
     it('should apply vertical mirror then horizontal mirror then rotate 90°', async () => {
       const imageBuffer = await buildTestQuadImage();
       const result = sut['applyEdits'](sharp(imageBuffer), [
