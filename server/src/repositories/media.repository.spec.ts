@@ -2,7 +2,7 @@ import sharp from 'sharp';
 import { AssetFace } from 'src/database';
 import { AssetEditAction, MirrorAxis } from 'src/dtos/editing.dto';
 import { AssetOcrResponseDto } from 'src/dtos/ocr.dto';
-import { SourceType } from 'src/enum';
+import { Colorspace, SourceType } from 'src/enum';
 import { LoggingRepository } from 'src/repositories/logging.repository';
 import { BoundingBox } from 'src/repositories/machine-learning.repository';
 import { MediaRepository } from 'src/repositories/media.repository';
@@ -339,6 +339,53 @@ describe(MediaRepository.name, () => {
           { action: AssetEditAction.Rotate, parameters: { angle: 43 } },
         ]),
       ).toThrow('Image dimensions are required for straighten edits');
+    });
+
+    it('should decode encoded images with straighten edits', async () => {
+      const imageBuffer = await sharp({
+        create: {
+          width: 100,
+          height: 80,
+          channels: 4,
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
+        },
+      })
+        .png()
+        .toBuffer();
+
+      await expect(
+        sut.decodeImage(imageBuffer, {
+          colorspace: Colorspace.Srgb,
+          processInvalidImages: false,
+          edits: [
+            { action: AssetEditAction.Crop, parameters: { x: 20, y: 20, width: 60, height: 40 } },
+            { action: AssetEditAction.Rotate, parameters: { angle: 10 } },
+          ],
+        }),
+      ).resolves.toMatchObject({
+        info: expect.objectContaining({
+          width: expect.any(Number),
+          height: expect.any(Number),
+        }),
+      });
+    });
+
+    it('should treat floating-point quarter turns as right-angle rotations', () => {
+      const image = sharp({
+        create: {
+          width: 100,
+          height: 80,
+          channels: 4,
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
+        },
+      }).png();
+
+      expect(() =>
+        sut['applyEdits'](image, [
+          { action: AssetEditAction.Crop, parameters: { x: 20, y: 20, width: 60, height: 40 } },
+          { action: AssetEditAction.Rotate, parameters: { angle: 90.000_000_000_000_01 } },
+        ]),
+      ).not.toThrow();
     });
 
     it('should apply vertical mirror then horizontal mirror then rotate 90°', async () => {

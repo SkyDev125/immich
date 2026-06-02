@@ -789,6 +789,30 @@ describe(AssetService.name, () => {
       expect(mocks.assetEdit.replaceAll).toHaveBeenCalledWith(asset.id, edits);
     });
 
+    it('should allow straighten crops with tiny negative transformed bounds', async () => {
+      const asset = {
+        ...AssetFactory.from({ id: 'asset-1' }).build(),
+        exifImageWidth: 1000,
+        exifImageHeight: 800,
+        orientation: '1',
+        projectionType: null,
+      };
+      const edits = [
+        { action: AssetEditAction.Crop, parameters: { x: -176.4, y: 89, width: 1106, height: 622 } },
+        { action: AssetEditAction.Rotate, parameters: { angle: 10 } },
+      ];
+      mocks.access.asset.checkOwnerAccess.mockResolvedValue(new Set([asset.id]));
+      mocks.asset.getForEdit.mockResolvedValue(asset);
+      mocks.assetEdit.replaceAll.mockResolvedValue(edits as any);
+
+      await expect(sut.editAsset(authStub.admin, asset.id, { edits })).resolves.toEqual({
+        assetId: asset.id,
+        edits,
+      });
+
+      expect(mocks.assetEdit.replaceAll).toHaveBeenCalledWith(asset.id, edits);
+    });
+
     it('should reject crops when asset dimensions are missing', async () => {
       const asset = {
         ...AssetFactory.from({ id: 'asset-1' }).build(),

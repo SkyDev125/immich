@@ -55,6 +55,8 @@ export enum ResizeBoundary {
 }
 
 class TransformManager implements EditToolManager {
+  private handleWindowMouseMove = (event: MouseEvent) => this.handleMouseMove(event);
+
   canReset: boolean = $derived.by(() => this.checkEdits());
   hasChanges: boolean = $state(false);
 
@@ -233,13 +235,22 @@ class TransformManager implements EditToolManager {
     });
 
     this.pendingInitialEdits = edits;
-    this.imgElement.addEventListener('load', () => transformManager.onImageLoad(edits), { passive: true });
-    this.imgElement.addEventListener('error', (error) => handleError(error, 'ErrorLoadingImage'), {
+    const imgElement = this.imgElement;
+    imgElement.addEventListener(
+      'load',
+      () => {
+        if (this.imgElement === imgElement) {
+          this.onImageLoad(this.pendingInitialEdits);
+        }
+      },
+      { passive: true },
+    );
+    imgElement.addEventListener('error', (error) => handleError(error, 'ErrorLoadingImage'), {
       passive: true,
     });
-    this.imgElement.src = imageURL;
+    imgElement.src = imageURL;
 
-    globalThis.addEventListener('mousemove', (e: MouseEvent) => transformManager.handleMouseMove(e), { passive: true });
+    globalThis.addEventListener('mousemove', this.handleWindowMouseMove, { passive: true });
 
     const transformEdits = edits.filter((e) => e.action === 'rotate' || e.action === 'mirror');
     // Normalize rotation and mirror edits into a quarter-turn rotation, straighten angle, and mirror state
@@ -259,7 +270,7 @@ class TransformManager implements EditToolManager {
   }
 
   onDeactivate() {
-    globalThis.removeEventListener('mousemove', transformManager.handleMouseMove);
+    globalThis.removeEventListener('mousemove', this.handleWindowMouseMove);
 
     this.reset();
   }

@@ -8,6 +8,11 @@ describe('calculateStraightenScale', () => {
   it('should scale a rotated image enough to cover its original bounds', () => {
     expect(calculateStraightenScale({ width: 1000, height: 800 }, 10)).toBeCloseTo(1.201);
   });
+
+  it('should return 1 for invalid image dimensions', () => {
+    expect(calculateStraightenScale({ width: 0, height: 800 }, 10)).toBe(1);
+    expect(calculateStraightenScale({ width: 1000, height: Number.NaN }, 10)).toBe(1);
+  });
 });
 
 describe('calculateLargestInscribedRect', () => {

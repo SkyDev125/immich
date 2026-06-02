@@ -303,6 +303,20 @@ describe('transformOcrBoundingBox', () => {
       expect(result.x4).toBeCloseTo(0.1, 5);
       expect(result.y4).toBeCloseTo(0.9, 5);
     });
+
+    it('should rotate -90 degrees as a 270 degree turn and reorder points', () => {
+      const edits: AssetEditActionItem[] = [{ action: AssetEditAction.Rotate, parameters: { angle: -90 } }];
+      const result = transformOcrBoundingBox(baseOcr, edits, baseDimensions);
+
+      expect(result.x1).toBeCloseTo(0.1, 5);
+      expect(result.y1).toBeCloseTo(0.8, 5);
+      expect(result.x2).toBeCloseTo(0.2, 5);
+      expect(result.y2).toBeCloseTo(0.8, 5);
+      expect(result.x3).toBeCloseTo(0.2, 5);
+      expect(result.y3).toBeCloseTo(0.9, 5);
+      expect(result.x4).toBeCloseTo(0.1, 5);
+      expect(result.y4).toBeCloseTo(0.9, 5);
+    });
   });
 
   describe('with mirror edit', () => {

@@ -112,9 +112,10 @@ export const transformPoints = (
     let matrix: Matrix = identity();
     if (edit.action === 'rotate') {
       const angleDegrees = edit.parameters.angle;
+      const { quarterTurn } = splitRotation(angleDegrees);
       const angleRadians = (angleDegrees * Math.PI) / 180;
-      const newWidth = angleDegrees === 90 || angleDegrees === 270 ? currentHeight : currentWidth;
-      const newHeight = angleDegrees === 90 || angleDegrees === 270 ? currentWidth : currentHeight;
+      const newWidth = quarterTurn === 90 || quarterTurn === 270 ? currentHeight : currentWidth;
+      const newHeight = quarterTurn === 90 || quarterTurn === 270 ? currentWidth : currentHeight;
 
       matrix = compose(
         translate(newWidth / 2, newHeight / 2),
@@ -234,8 +235,9 @@ export const transformOcrBoundingBox = (
   const { points: transformedPoints, currentWidth, currentHeight } = transformPoints(points, edits, imageDimensions);
 
   // Reorder points to maintain semantic ordering (topLeft, topRight, bottomRight, bottomLeft)
-  const netRotation = edits.find((e) => e.action == AssetEditAction.Rotate)?.parameters.angle ?? 0 % 360;
-  const reorderedPoints = reorderQuadPointsForRotation(transformedPoints, netRotation);
+  const netRotation = edits.find((e) => e.action === AssetEditAction.Rotate)?.parameters.angle ?? 0;
+  const { quarterTurn } = splitRotation(netRotation);
+  const reorderedPoints = reorderQuadPointsForRotation(transformedPoints, quarterTurn);
 
   const [p1, p2, p3, p4] = reorderedPoints;
   return {

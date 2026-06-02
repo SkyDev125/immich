@@ -47,7 +47,7 @@ export const getEffectiveStraightenRotation = (angle: number, edits: AssetEditAc
  * Returns the scale needed to rotate an image without exposing empty corners.
  */
 export const getStraightenScale = ({ width, height }: ImageDimensions, straightenAngle: number) => {
-  if (straightenAngle === 0) {
+  if (straightenAngle === 0 || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     return 1;
   }
 

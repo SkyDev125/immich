@@ -46,7 +46,7 @@ import {
 } from 'src/utils/asset.util';
 import { updateLockedColumns } from 'src/utils/database';
 import { extractTimeZone } from 'src/utils/date';
-import { getRotatedCanvasDimensions, getStraightenExtractRectangle } from 'src/utils/editor';
+import { getRotatedCanvasDimensions, getStraightenExtractRectangle, splitRotation } from 'src/utils/editor';
 import { transformOcrBoundingBox } from 'src/utils/transform';
 
 const STRAIGHTEN_BOUNDS_EPSILON = 1;
@@ -585,7 +585,7 @@ export class AssetService extends BaseService {
 
       // check that crop parameters will not go out of bounds
       const rotateEdit = edits.find((e) => e.action === AssetEditAction.Rotate);
-      const straightenActive = rotateEdit && rotateEdit.parameters.angle % 90 !== 0;
+      const straightenActive = rotateEdit && splitRotation(rotateEdit.parameters.angle).straightenAngle !== 0;
 
       if (straightenActive) {
         const extract = getStraightenExtractRectangle(
@@ -602,8 +602,8 @@ export class AssetService extends BaseService {
         if (
           extract.width < 1 ||
           extract.height < 1 ||
-          extract.left < 0 ||
-          extract.top < 0 ||
+          extract.left < -STRAIGHTEN_BOUNDS_EPSILON ||
+          extract.top < -STRAIGHTEN_BOUNDS_EPSILON ||
           extract.left + extract.width > target.width + STRAIGHTEN_BOUNDS_EPSILON ||
           extract.top + extract.height > target.height + STRAIGHTEN_BOUNDS_EPSILON
         ) {

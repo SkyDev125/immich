@@ -11,7 +11,13 @@ export type Rect = {
 };
 
 export function calculateStraightenScale(imageSize: Size, angleDegrees: number): number {
-  if (angleDegrees === 0) {
+  if (
+    angleDegrees === 0 ||
+    !Number.isFinite(imageSize.width) ||
+    !Number.isFinite(imageSize.height) ||
+    imageSize.width <= 0 ||
+    imageSize.height <= 0
+  ) {
     return 1;
   }
 
